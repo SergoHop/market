@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Продать товар</title>
+</head>
+<body>
+    <form action="/sell" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ .CSRF }}">
+        <input type="text" name="name" placeholder="Название" required><br>
+        <input type="number" name="price" placeholder="Цена" required><br>
+        <textarea name="description" placeholder="Описание"></textarea><br>
+        <input type="file" name="image" accept="image/*"><br>
+        <button type="submit">Выставить на продажу</button>
+    </form>
+</body>
+</html>
