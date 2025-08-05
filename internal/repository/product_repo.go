@@ -2,15 +2,16 @@ package repository
 
 import (
 	"github.com/jmoiron/sqlx"
-	_"time"
+    "time"
 	"market/internal/models"
-	_"log"
-    "fmt"
+	"log"
+    
 )
 
 type ProductRepository interface {
 	CreateProduct(product *models.Product) error
     GetActiveProducts() ([]models.Product, error)
+    
 }
 
 type productRepository struct {
@@ -22,38 +23,46 @@ func NewProductRepository(db *sqlx.DB) ProductRepository {
 }
 
 func (r *productRepository) CreateProduct(product *models.Product) error {
-	query := `
-		INSERT INTO products 
-		(name, price, description, created_at, expires_at) 
-		VALUES ($1, $2, $3, NOW(), NOW() + INTERVAL '2 hours') 
-		RETURNING id`
-	
-	return r.db.QueryRow(
-		query,
-		product.Name,
-		product.Price,
-		product.Description,
-	).Scan(&product.ID)
+    product.ExpiresAt = time.Now().Add(2 * time.Hour) 
+    
+    err := r.db.QueryRow(`
+        INSERT INTO products (name, price, description, image_path, created_at, expires_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id`,
+        product.Name,
+        product.Price,
+        product.Description,
+        product.ImagePath,
+        time.Now(),
+        product.ExpiresAt,
+    ).Scan(&product.ID)
+    
+    return err
 }
 
 func (r *productRepository) GetActiveProducts() ([]models.Product, error) {
     var products []models.Product
+    
     err := r.db.Select(&products, `
-        SELECT 
-            id, 
-            name, 
-            price, 
-            description, 
-            image_path,
-            created_at,
-            expires_at
+        SELECT id, name, price, description, 
+               image_path, created_at, expires_at
         FROM products 
         WHERE expires_at > NOW()
         ORDER BY created_at DESC`)
     
     if err != nil {
-        return nil, fmt.Errorf("ошибка запроса товаров: %w", err)
+        log.Printf("DB Query Error: %v\n", err)
+        return nil, err
     }
+    
+    // Убрали обращение к products[0] при пустом списке
+    if len(products) > 0 {
+        log.Printf("Loaded %d products, first expires at: %v\n", 
+            len(products), 
+            products[0].ExpiresAt.Format("2006-01-02 15:04:05"))
+    } else {
+        log.Println("No active products found")
+    }
+    
     return products, nil
 }
-

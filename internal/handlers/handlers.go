@@ -13,6 +13,7 @@ import (
 	"io"
 	"mime/multipart"
     _ "github.com/jmoiron/sqlx"
+    
 )
 
 type ProductHandler struct {
@@ -20,7 +21,7 @@ type ProductHandler struct {
 }
 
 func HomePage(c *gin.Context){
-	c.HTML(http.StatusOK, "index.html", nil)
+	renderPage(c, "index.html", nil)
 }
 
 func NewProductHandler(repo repository.ProductRepository) *ProductHandler {
@@ -28,60 +29,50 @@ func NewProductHandler(repo repository.ProductRepository) *ProductHandler {
 }
 
 func SellPage(c *gin.Context){
-	c.HTML(http.StatusOK, "sell.html",nil)
+	renderPage(c, "sell.html", nil)
 }
 
 func (h *ProductHandler) HandleSell(c *gin.Context) {
-	name := c.PostForm("name")
-	priceStr := c.PostForm("price")
-	description := c.PostForm("description")
-	
-	price, err := strconv.ParseFloat(priceStr, 64)
-	if err != nil {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Error": "Некорректная цена",
-		})
-		return
-	}
-    var imagePath *string
-    file, header, err := c.Request.FormFile("image")
-    if err == nil {
-        defer file.Close()
-        path := "uploads/" + header.Filename
-        if err := saveUploadedFile(file, path); err == nil {
-            imagePath = &path
-        }
-    }
+    name := c.PostForm("name")
+    priceStr := c.PostForm("price")
+    description := c.PostForm("description")
 
-	product := models.Product{
-		Name:        name,
-		Price:       price,
-		Description: description,
-        ImagePath:   imagePath,
-	}
-
-	if err := h.repo.CreateProduct(&product); err != nil {
-		c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-			"Error": "Не удалось сохранить товар",
-		})
-		return
-	}
-
-	c.Redirect(http.StatusFound, "/after-sell")
-}
-
-func (h *ProductHandler) BuyPage(c *gin.Context) {
-    products, err := h.repo.GetActiveProducts()
+    price, err := strconv.ParseFloat(priceStr, 64)
     if err != nil {
-        log.Printf("DB error: %v", err)
-        c.HTML(http.StatusInternalServerError, "error.html", gin.H{
-            "Error": "Не удалось загрузить список товаров",
-        })
+        renderError(c, "Некорректная цена")
         return
     }
 
-    log.Printf("Loaded %d products", len(products))
-    
+    imagePath := handleImageUpload(c)
+
+    product := models.Product{
+        Name:        name,
+        Price:       price,
+        Description: description,
+        ImagePath:   imagePath,
+    }
+
+    if err := h.repo.CreateProduct(&product); err != nil {
+        renderError(c, "Не удалось сохранить товар")
+        return
+    }
+
+    c.Redirect(http.StatusFound, "/after-sell")
+}
+
+
+func (h *ProductHandler) BuyPage(c *gin.Context) {
+    // Получаем ВСЕ товары без фильтрации по времени
+    products, err := h.repo.GetActiveProducts()
+    if err != nil {
+        log.Printf("Ошибка получения товаров: %v", err)
+        renderError(c, "Не удалось загрузить товары")
+        return
+    }
+
+    // Логируем количество полученных товаров
+    log.Printf("Получено товаров: %d", len(products))
+
     c.HTML(http.StatusOK, "buy.html", gin.H{
         "Products": products,
         "Now":      time.Now(),
@@ -89,9 +80,9 @@ func (h *ProductHandler) BuyPage(c *gin.Context) {
 }
 
 func AfterSellPage(c *gin.Context) {
-    c.HTML(http.StatusOK, "after_sell.html", gin.H{
-        "Title": "Что вы хотите сделать?",
-    })
+    renderPage(c, "after_sell.html", gin.H{
+		"Title": "Что вы хотите сделать?",
+	})
 }
 
 func saveUploadedFile(file multipart.File, dst string) error {
@@ -104,4 +95,30 @@ func saveUploadedFile(file multipart.File, dst string) error {
 	_, err = io.Copy(out, file)
 	return err
 }
+//вспомагательная футкция для ошибки
+func renderError(c *gin.Context, message string) {
+    c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+        "Error": message,
+    })
+}
+//обработка картинки 
+func handleImageUpload(c *gin.Context) *string {
+    file, header, err := c.Request.FormFile("image")
+    if err != nil {
+        return nil
+    }
+    defer file.Close()
+
+    path := "uploads/" + header.Filename
+    if err := saveUploadedFile(file, path); err != nil {
+        return nil
+    }
+    return &path
+}
+//общ функция для рендера
+func renderPage(c *gin.Context, templateName string, data gin.H) {
+	c.HTML(http.StatusOK, templateName, data)
+}
+
+
 

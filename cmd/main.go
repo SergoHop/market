@@ -1,60 +1,47 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
-	"log"
-	"market/internal/database"
-	"market/internal/handlers"
-	"market/internal/repository"
-	"net/http"
-	"time"
-	_ "fmt"
+    "log"
+    "market/internal/handlers"
+    "market/internal/repository"
+    "market/internal/database"
 	"html/template"
-	
+    "github.com/gin-gonic/gin"
 )
 
 func main() {
-	db, err := database.ConnectDB()
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer db.Close()
+    db, err := database.ConnectDB() // подключение к базе
+    if err != nil {
+        log.Fatal("Ошибка подключения к БД:", err)
+    }
 
-	loc, err := time.LoadLocation("Europe/Moscow")
-	if err == nil {
-		time.Local = loc
-	}
+    repo := repository.NewProductRepository(db)
+    handler := handlers.NewProductHandler(repo)
 
-	productRepo := repository.NewProductRepository(db)
+    r := gin.Default()
 
-	productHandler := handlers.NewProductHandler(productRepo)
+	funcMap := template.FuncMap{
+        "div": func(a, b float64) float64 { return a / b },
+        "mod": func(a, b float64) float64 { return float64(int(a) % int(b)) },
+    }
 
-	r := gin.Default()
+    r.SetFuncMap(funcMap)
+    r.LoadHTMLGlob("templates/*")
 
-	r.SetFuncMap(template.FuncMap{
-		"div": func(a, b float64) float64 { return a / b },
-        "mod": func(a, b int) int { return a % b },
-	})
+    // Настройка шаблонов и статики
+    r.LoadHTMLGlob("templates/*")
+    r.Static("/static", "./static")
+    r.Static("/uploads", "./uploads")
 
-	r.LoadHTMLGlob("templates/*")
+    // Маршруты
+    r.GET("/", handlers.HomePage)
+    r.GET("/sell", handlers.SellPage)
+    r.POST("/sell", handler.HandleSell)
+    r.GET("/buy", handler.BuyPage)
+    r.GET("/after-sell", handlers.AfterSellPage)
 
-	r.GET("/", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "index.html", nil)
-	})
-
-	r.GET("/sell", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "sell.html", nil)
-	})
-	r.POST("/sell", productHandler.HandleSell)
-
-	r.GET("/buy", productHandler.BuyPage)
-
-	r.GET("/after-sell", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "after_sell.html", nil)
-	})
-
-	port := ":8080"
-	log.Printf("Server started on http://localhost%s", port)
-	log.Fatal(r.Run(port))
+    // Старт сервера
+    if err := r.Run(":8080"); err != nil {
+        log.Fatal("Ошибка запуска сервера:", err)
+    }
 }
-
