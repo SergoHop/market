@@ -95,6 +95,30 @@ func saveUploadedFile(file multipart.File, dst string) error {
 	_, err = io.Copy(out, file)
 	return err
 }
+
+func (h *ProductHandler) HandleBuy(c *gin.Context) {
+    idStr := c.Param("id")
+    id, err := strconv.Atoi(idStr)
+    if err != nil {
+        c.HTML(http.StatusBadRequest, "error.html", gin.H{
+            "Error": "Некорректный ID товара",
+        })
+        return
+    }
+
+    if err := h.repo.MarkAsSold(id); err != nil {
+        log.Printf("Ошибка при покупке товара ID=%d: %v", id, err)
+        c.HTML(http.StatusInternalServerError, "error.html", gin.H{
+            "Error": "Не удалось купить товар",
+        })
+        return
+    }
+
+    c.Redirect(http.StatusFound, "/buy")
+}
+
+
+
 //вспомагательная футкция для ошибки
 func renderError(c *gin.Context, message string) {
     c.HTML(http.StatusInternalServerError, "error.html", gin.H{

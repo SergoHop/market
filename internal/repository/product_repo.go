@@ -11,7 +11,7 @@ import (
 type ProductRepository interface {
 	CreateProduct(product *models.Product) error
     GetActiveProducts() ([]models.Product, error)
-    
+    MarkAsSold(productID int) error
 }
 
 type productRepository struct {
@@ -66,3 +66,12 @@ func (r *productRepository) GetActiveProducts() ([]models.Product, error) {
     
     return products, nil
 }
+
+func (r *productRepository) MarkAsSold(id int) error {
+    _, err := r.db.Exec(`
+        UPDATE products 
+        SET expires_at = NOW() 
+        WHERE id = $1`, id)
+    return err
+}
+

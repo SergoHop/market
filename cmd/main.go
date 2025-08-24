@@ -39,6 +39,7 @@ func main() {
     r.POST("/sell", handler.HandleSell)
     r.GET("/buy", handler.BuyPage)
     r.GET("/after-sell", handlers.AfterSellPage)
+    r.POST("/buy/:id", handler.HandleBuy)
 
     // Старт сервера
     if err := r.Run(":8080"); err != nil {
