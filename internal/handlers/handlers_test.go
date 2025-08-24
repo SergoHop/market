@@ -19,15 +19,21 @@ func (f *fakeRepo) CreateProduct(product *models.Product) error {
 	return nil
 }
 
+func (f *fakeRepo) MarkAsSold(productID int) error {
+
+    return nil
+}
+
 func (f *fakeRepo) GetActiveProducts() ([]models.Product, error) {
-	return []models.Product{
-		{
-			ID:        1,
-			Name:      "Товар 1",
-			Price:     100,
-			ExpiresAt: time.Now().Add(1 * time.Hour),
-		},
-	}, nil
+    return []models.Product{
+        {
+            ID:          1,
+            Name:        "Товар 1",
+            Price:       100,
+            Description: "Описание товара",
+            ExpiresAt:   time.Now().Add(time.Hour),
+        },
+    }, nil
 }
 
 func TestBuyPage(t *testing.T){
